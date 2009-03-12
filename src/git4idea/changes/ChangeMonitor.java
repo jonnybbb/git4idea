@@ -12,16 +12,19 @@ package git4idea.changes;
  * Copyright 2008 MQSoftware
  * Authors: Mark Scott
  */
-import com.intellij.openapi.application.RuntimeInterruptedException;
+
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.RuntimeInterruptedException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.vcs.VcsException;
 import com.intellij.openapi.vcs.changes.ChangeListManager;
 import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager;
 import com.intellij.openapi.vfs.VirtualFile;
+import git4idea.GitVcs;
 import git4idea.commands.GitCommand;
 import git4idea.config.GitVcsSettings;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -30,8 +33,9 @@ import java.util.Set;
  * Monitor un-cached filesystem changes in the Git repository
  */
 public class ChangeMonitor extends Thread {
+    public final static boolean DEBUG = false;
     private static Map<Project, ChangeMonitor> instances = new HashMap<Project, ChangeMonitor>();
-    private static int DEF_INTERVAL_SECS = 20;
+    private static int DEF_INTERVAL_SECS = 60;
     private long interval = DEF_INTERVAL_SECS * 1000L;
     private GitVcsSettings settings;
     private Project project;
@@ -44,13 +48,18 @@ public class ChangeMonitor extends Thread {
         ChangeMonitor monitor = instances.get(proj);
         if (monitor == null) {
             monitor = new ChangeMonitor(proj);
-            instances.put(proj,monitor);
+            instances.put(proj, monitor);
         }
         return monitor;
     }
 
+    public static synchronized void removeInstance(Project proj) {
+        instances.remove(proj);
+    }
+
     /**
      * Create a Git change monitor thread.
+     *
      * @param project the VCS project to monitor
      */
     private ChangeMonitor(Project project) {
@@ -77,6 +86,8 @@ public class ChangeMonitor extends Thread {
     }
 
     public void start() {
+        if(running) return;
+        
         if (project == null || settings == null)
             throw new IllegalStateException("Project & VCS settings not set!");
         if (!running) {
@@ -120,11 +131,11 @@ public class ChangeMonitor extends Thread {
         while (running) {
             try {
                 check();
-                sleep(interval);
-            } catch (InterruptedException e) {
-            } catch (RuntimeInterruptedException e) {
-            } catch (Throwable e) {
-                e.printStackTrace();
+                Thread.sleep(interval);
+            } catch (InterruptedException ie) {
+            } catch (RuntimeInterruptedException rie) {
+            } catch (Throwable t) {
+                t.printStackTrace();
             }
         }
     }
@@ -133,32 +144,40 @@ public class ChangeMonitor extends Thread {
      * Check to see what files have changed under the monitored content roots.
      */
     @SuppressWarnings({"EmptyCatchBlock"})
-    private void check() {
+    private void check() throws InterruptedException {
         try {
+            if (DEBUG) {
+                GitVcs.getInstance(project).showMessages("DEBUG: ChangeMonitor.check() start");
+            }
             final VirtualFile[] roots = ProjectRootManager.getInstance(project).getContentRoots();
             for (VirtualFile root : roots) {
+                if (this.isInterrupted()) throw new InterruptedException("Check interrupted!");
                 if (root == null) continue;
+                if (DEBUG) {
+                    GitVcs.getInstance(project).showMessages("DEBUG: ChangeMonitor root:" + root.getName());
+                }
                 final GitCommand cmd = new GitCommand(project, settings, root);
                 uncachedFiles.put(root, cmd.gitUnCachedFiles());
                 otherFiles.put(root, cmd.gitOtherFiles());
                 //ignoredFiles.put(root, cmd.gitIgnoredFiles());
             }
-            try {
-                Thread.sleep(5000);
-            } catch (InterruptedException e) {
-            }
+            Thread.sleep(5000);
+
             ApplicationManager.getApplication().invokeLater(
-                        new Runnable() {
-                            public void run() {
-                                for(VirtualFile root: roots) {
-                                    if (root == null) continue;
-                                    VcsDirtyScopeManager.getInstance(project).dirDirtyRecursively(root);
-                                }
-                                ChangeListManager.getInstance(project).scheduleUpdate(true);
+                    new Runnable() {
+                        public void run() {
+                            for (VirtualFile root : roots) {
+                                if (root == null) continue;
+                                VcsDirtyScopeManager.getInstance(project).dirDirtyRecursively(root);
                             }
-                        });
+                            ChangeListManager.getInstance(project).scheduleUpdate(true);
+                        }
+                    });
         } catch (VcsException ve) {
             ve.printStackTrace();
+        }
+        if (DEBUG) {
+            GitVcs.getInstance(project).showMessages("DEBUG: ChangeMonitor.check() end");
         }
     }
 }

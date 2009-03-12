@@ -247,6 +247,7 @@ public class GitVcs extends AbstractVcs implements Disposable {
         Disposer.dispose(activationDisposable);
         activationDisposable = null;
         ChangeMonitor.getInstance(myProject).stopRunning();
+        ChangeMonitor.removeInstance(myProject); // re-using threads is too hard... start over
     }
 
     @NotNull

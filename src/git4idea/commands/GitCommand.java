@@ -504,15 +504,20 @@ public class GitCommand {
             }
 
             String[] options = null;
-
+            File temp;
+            BufferedWriter out = null;
             try {
-                File temp = File.createTempFile("git-commit-msg", ".txt");
-                temp.deleteOnExit();
-                BufferedWriter out = new BufferedWriter(new FileWriter(temp));
-                out.write(commitMessage.toString());
-                out.close();
+                temp = File.createTempFile("git-commit-msg", ".txt");
                 options = new String[]{"-i", "-F", temp.getAbsolutePath()};
+                temp.deleteOnExit();
+                out = new BufferedWriter(new FileWriter(temp));
+                out.write(commitMessage.toString());
             } catch (IOException e) {
+            } finally {
+                try {
+                if(out != null)
+                    out.close();
+                }catch(IOException ioe) {}
             }
 
             String[] args = new String[files.length];

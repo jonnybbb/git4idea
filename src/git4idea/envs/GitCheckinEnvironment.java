@@ -30,15 +30,20 @@ import com.intellij.openapi.vcs.changes.ContentRevision;
 import com.intellij.openapi.vcs.checkin.CheckinEnvironment;
 import com.intellij.openapi.vcs.ui.RefreshableOnComponent;
 import com.intellij.openapi.vfs.VirtualFile;
+import git4idea.GitUtil;
 import git4idea.actions.Add;
 import git4idea.actions.Delete;
 import git4idea.commands.GitCommand;
-import git4idea.vfs.GitVirtualFile;
 import git4idea.config.GitVcsSettings;
-import git4idea.GitUtil;
+import git4idea.vfs.GitVirtualFile;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -53,6 +58,8 @@ import java.util.Set;
 public class GitCheckinEnvironment implements CheckinEnvironment {
     private Project project;
     private GitVcsSettings settings;
+    private String tmpDir = System.getProperty("java.io.tmpdir");
+    private File commitMsgFile = new File(tmpDir + File.separator + ".git-commit-msg");
 
     public GitCheckinEnvironment(@NotNull Project project, @NotNull GitVcsSettings settings) {
         this.project = project;
@@ -76,12 +83,33 @@ public class GitCheckinEnvironment implements CheckinEnvironment {
     @Override
     @Nullable
     public String getDefaultMessageFor(FilePath[] filesToCheckin) {
-        return "\n# Brief commit desciption here\n\n# Full commit description here (comment lines starting with '#' will not be included)\n\n";
+        String defaultMsg = "\n# Brief commit desciption here\n\n# Full commit description here (comment lines starting with '#' will not be included)\n\n";
+        if (commitMsgFile.exists() && commitMsgFile.canRead()) {
+            byte[] msgBytes = new byte[(int) commitMsgFile.length()];
+            FileInputStream fis = null;
+            try {
+                fis = new FileInputStream(commitMsgFile);
+                fis.read(msgBytes);
+                fis.close();
+                return new String(msgBytes);
+            } catch (Exception e) {
+                return defaultMsg;
+            } finally {
+                try {
+                    if (fis != null)
+                        fis.close();
+                } catch (IOException ie) {
+                    commitMsgFile.delete();
+                }
+            }
+        } else {
+            return defaultMsg;
+        }
     }
 
     @Override
     public String prepareCheckinMessage(String text) {
-        return null;
+        return text;
     }
 
     @Nullable
@@ -104,16 +132,31 @@ public class GitCheckinEnvironment implements CheckinEnvironment {
     public List<VcsException> commit(@NotNull final List<Change> changes, @NotNull final String message) {
         final int changeCount = changes.size();
         final List<VcsException> exceptions = new ArrayList<VcsException>(changeCount);
-        if(changeCount == 0) return null;
-        
+        if (changeCount == 0) return null;
+
+        if(message != null && message.length() > 0) {
+            FileOutputStream fos = null;
+            try {
+                fos = new FileOutputStream(commitMsgFile);
+                fos.write(message.getBytes());
+            } catch (IOException ioe) {
+            } finally {
+                try {
+                    if (fos != null)
+                        fos.close();
+                } catch (IOException ioe) {
+                }
+            }
+        }
+
         Runnable command = new Runnable() {
             public void run() {
                 final ProgressIndicator progress = ProgressManager.getInstance().getProgressIndicator();
                 progress.setIndeterminate(true);
 
                 Map<VirtualFile, List<Change>> sortedChanges = sortChangesByVcsRoot(changes);
-                
-                if(changeCount == 1)
+
+                if (changeCount == 1)
                     progress.setText2("Commiting change...");
                 else
                     progress.setText2("Commiting " + changes.size() + " changes...");
@@ -147,7 +190,7 @@ public class GitCheckinEnvironment implements CheckinEnvironment {
         } else {
             command.run();
         }
-        
+
         return exceptions;
     }
 
