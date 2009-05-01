@@ -83,7 +83,7 @@ public class Revert extends BasicAction {
     @Override
     protected boolean isEnabled(@NotNull Project project, @NotNull GitVcs vcs, @NotNull VirtualFile... vFiles) {
         for (VirtualFile file : vFiles) {
-            if (!vcs.getFileAdapter().isFileProcessable(file)) return false;
+            if (!vcs.getFileAdapter().isGitControlled(file)) return false;
             FileStatus status = FileStatusManager.getInstance(project).getStatus(file);
             if (status == FileStatus.UNKNOWN || status == FileStatus.NOT_CHANGED)
                 return false;

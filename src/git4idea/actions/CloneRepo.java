@@ -16,23 +16,23 @@ package git4idea.actions;
  *
  * This code was originally derived from the MKS & Mercurial IDEA VCS plugins
  */
+
 import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.vcs.AbstractVcs;
 import com.intellij.openapi.vcs.VcsException;
 import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.openapi.progress.ProgressManager;
-import git4idea.GitUtil;
+import git4idea.GitVcs;
 import git4idea.commands.GitCommand;
 import git4idea.commands.GitCommandRunnable;
-import git4idea.GitVcs;
+import git4idea.vfs.GitVirtualFile;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Use Git to clone a repository
@@ -43,38 +43,33 @@ public class CloneRepo extends BasicAction {
                         @NotNull VirtualFile[] affectedFiles) throws VcsException {
         saveAll();
 
-        // TODO: implement remote repository login/password - setup remote repos in Git config,
-        // TODO: then just reference repo name here
-        final String src_repo = Messages.showInputDialog(project, "Specify source repository URL", "clone",
+        final String repoURL = Messages.showInputDialog(project, "Specify repository clone URL", "clone",
                 Messages.getQuestionIcon());
-        if (src_repo == null)
+        if (repoURL == null || (repoURL.length() == 0))
             return;
 
         FileChooserDescriptor fcd = new FileChooserDescriptor(false, true, false, false, false, false);
         fcd.setShowFileSystemRoots(true);
-        fcd.setTitle("Destination Directory");
-        fcd.setDescription("Select destination directory for clone.");
+        fcd.setTitle("Repository Parent Directory");
+        fcd.setDescription("Select parent directory for clone.");
         fcd.setHideIgnored(false);
         VirtualFile[] files = FileChooser.chooseFiles(project, fcd, null);
         if (files.length != 1 || files[0] == null) {
             return;
         }
 
-        final Map<VirtualFile, List<VirtualFile>> roots = GitUtil.sortFilesByVcsRoot(project, affectedFiles);
-        for (VirtualFile root : roots.keySet()) {
-            GitCommandRunnable cmdr = new GitCommandRunnable(project, vcs.getSettings(), root);
-            cmdr.setCommand(GitCommand.CLONE_CMD);
-            cmdr.setArgs(new String[]{src_repo, files[0].getPath()});
+        GitCommandRunnable cmdr = new GitCommandRunnable(project, vcs.getSettings(),
+                new GitVirtualFile(project, files[0].getPath()));
+        cmdr.setCommand(GitCommand.CLONE_CMD);
+        cmdr.setArgs(new String[]{repoURL});
 
-            ProgressManager manager = ProgressManager.getInstance();
-            //TODO: make this async so the git command output can be seen in the version control window as it happens...
-            manager.runProcessWithProgressSynchronously(cmdr, "Cloning source repo " + src_repo, false, project);
+        ProgressManager manager = ProgressManager.getInstance();
+        manager.runProcessWithProgressSynchronously(cmdr, "Cloning repository " + repoURL, false, project);
 
-            VcsException ex = cmdr.getException();
-            if (ex != null) {
-                Messages.showErrorDialog(project, ex.getMessage(), "Error occurred during 'git clone'");
-                break;
-            }
+        VcsException ex = cmdr.getException();
+        if (ex != null) {
+            Messages.showErrorDialog(project, ex.getMessage(), "Error occurred during 'git clone'");
+            return;
         }
 
         VcsDirtyScopeManager mgr = VcsDirtyScopeManager.getInstance(project);

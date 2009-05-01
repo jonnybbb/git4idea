@@ -54,23 +54,20 @@ public class Push extends BasicAction {
             if (root == null) continue;
             String initialValue = null;
             String repo = Messages.showInputDialog(project,
-                    "Enter repository to push to (empty for default/origin):",
-                    "Push To Repo <-- " + root.getPath(), Messages.getQuestionIcon(), initialValue, null);
+                    "Enter repository & refspec to push to (empty for default/origin):",
+                    "Push <repository> <refspec>... To Repo <-- " + root.getPath(), Messages.getQuestionIcon(), initialValue, null);
 
             GitCommandRunnable cmdr = new GitCommandRunnable(project, vcs.getSettings(), root);
             cmdr.setCommand(GitCommand.PUSH_CMD);
             if (repo != null)
-                cmdr.setArgs(new String[]{"--mirror", repo});
-            else
-                cmdr.setArgs(new String[]{"--mirror"});
+                cmdr.setArgs(new String[]{ repo });
 
             ProgressManager manager = ProgressManager.getInstance();
-            manager.runProcessWithProgressSynchronously(cmdr, "Pushing all commited changes, refs & tags to remote repos",
-                    false, project);
+            manager.runProcessWithProgressSynchronously(cmdr, "Pushing...", false, project);
 
             VcsException ex = cmdr.getException();
             if (ex != null) {
-                Messages.showErrorDialog(project, ex.getMessage(), "Error occurred during 'git push --mirror'");
+                Messages.showErrorDialog(project, ex.getMessage(), "Error occurred during 'git push'");
             }
         }
     }

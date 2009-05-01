@@ -52,7 +52,8 @@ public class GitVirtualFileAdapter extends VirtualFileAdapter implements LocalFi
     private static final String DEL_TITLE = "Delete file";
     private static final String DEL_MESSAGE = "Delete file(s) in Git?\n{0}";
     private Set<String> ignoreFiles = new HashSet<String>();
-    private Set<String> knownFiles = new HashSet<String>();
+    private Set<String> gitFiles = new HashSet<String>();
+    private Set<String> nonGitFiles = new HashSet<String>();
 
     public GitVirtualFileAdapter(@NotNull GitVcs vcs, @NotNull Project project) {
         this.vcs = vcs;
@@ -69,7 +70,7 @@ public class GitVirtualFileAdapter extends VirtualFileAdapter implements LocalFi
             return;
 
         final VirtualFile file = event.getFile();
-        if (!isFileProcessable(file))
+        if (!isGitControlled(file))
             return;
 
         VirtualFile vcsRoot = VcsUtil.getVcsRootFor(project, file);
@@ -113,10 +114,10 @@ public class GitVirtualFileAdapter extends VirtualFileAdapter implements LocalFi
         }
 
         if (filesToAdd == null || filesToAdd.size() == 0) {
-            ignoreFile(file, true);
+            gitControlFile(file, true);
             return;
         } else {
-            ignoreFile(file, false);
+            gitControlFile(file, false);
         }
 
         VirtualFile vcsRoot = VcsUtil.getVcsRootFor(project, file);
@@ -146,7 +147,7 @@ public class GitVirtualFileAdapter extends VirtualFileAdapter implements LocalFi
             return;
 
         final VirtualFile file = event.getFile();
-        if (!isFileProcessable(file))
+        if (!isGitControlled(file))
             return;
 
         List<VirtualFile> files = new ArrayList<VirtualFile>();
@@ -192,7 +193,7 @@ public class GitVirtualFileAdapter extends VirtualFileAdapter implements LocalFi
             return;
 
         final VirtualFile file = event.getFile();
-        if (!isFileProcessable(file))
+        if (!isGitControlled(file))
             return;
 
         VirtualFile vcsRoot = VcsUtil.getVcsRootFor(project, file);
@@ -270,29 +271,30 @@ public class GitVirtualFileAdapter extends VirtualFileAdapter implements LocalFi
 
 
     /**
-     * Specify whether or not Git should ignored the given files.
+     * Specify whether or not Git is controlling the given files.
      * @param files  The files to ignore/not-ignore
-     * @param ignoreMe  true if the files should be ignored, else false
+     * @param control  true if the files should be controlled by Git, else false
      */
-    public void ignoreFiles(@NotNull VirtualFile[] files, boolean ignoreMe) {
+    public void gitControlFiles(@NotNull VirtualFile[] files, boolean control) {
         if(files.length == 0) return;
         for (VirtualFile file : files) {
             if (file != null)
-                ignoreFile(file, ignoreMe);
+                gitControlFile(file, control);
         }
     }
 
     /**
-     * Specify whether or not Git should ignored the given file.
+     * Specify whether or not Git is controlling the given file.
      * @param file The file to ignore/not-ignore
-     * @param ignoreMe  true if the file should be ignored, else false
+     * @param control  true if the file is controlled by Git, else false
      */
-    public void ignoreFile(@NotNull VirtualFile file, boolean ignoreMe) {
-        if (ignoreMe)
-            ignoreFiles.add(file.getPath());
-        else {
+    public void gitControlFile(@NotNull VirtualFile file, boolean control) {
+        if (control) {
             ignoreFiles.remove(file.getPath());
-            knownFiles.add(file.getPath());
+            nonGitFiles.remove(file.getPath());
+            gitFiles.add(file.getPath());
+        } else {
+            ignoreFiles.add(file.getPath());
         }
     }
 
@@ -302,12 +304,13 @@ public class GitVirtualFileAdapter extends VirtualFileAdapter implements LocalFi
      * @param file The file to query
      * @return true if git is ignoring the file, else false
      */
-    public boolean ignoreFile(@NotNull VirtualFile file) {
+    public boolean fileIsIgnored(@NotNull VirtualFile file) {
+        isGitControlled(file);
         return ignoreFiles.contains(file.getPath());
     }
 
     /** Returns the current list of ignored files for this project. */
-    public Set<String> getIgnoreFiles() {
+    public Set<String> getIgnoredFiles() {
         return ignoreFiles;
     }
 
@@ -321,8 +324,9 @@ public class GitVirtualFileAdapter extends VirtualFileAdapter implements LocalFi
      * @param file The file to check.
      * @return Returns true of the file can be added.
      */
-    public boolean isFileProcessable(@NotNull VirtualFile file) {
-        if (knownFiles.contains(file.getPath())) return true;
+    public boolean isGitControlled(@NotNull VirtualFile file) {
+        if (gitFiles.contains(file.getPath())) return true;
+        if (nonGitFiles.contains(file.getPath())) return false;
         if (ignoreFiles.contains(file.getPath())) return false;
 
         if (file.isDirectory() && file.getName().equals(".git")) {
@@ -336,17 +340,17 @@ public class GitVirtualFileAdapter extends VirtualFileAdapter implements LocalFi
 
         VirtualFile vcsRoot = VcsUtil.getVcsRootFor(project, file);
         if(vcsRoot == null) {
-            ignoreFiles.add(file.getPath());
+            nonGitFiles.add(file.getPath());
             return false;
         }
 
         GitCommand command = new GitCommand(project, vcs.getSettings(), vcsRoot);
         try {
             if(command.status(file)) {
-                knownFiles.add(file.getPath());
+                gitFiles.add(file.getPath());
                 return true;
             } else {
-                ignoreFiles.add(file.getPath());
+                nonGitFiles.add(file.getPath());
                 return false;
             }
         } catch (VcsException e) {

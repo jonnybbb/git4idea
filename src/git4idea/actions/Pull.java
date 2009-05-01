@@ -50,66 +50,25 @@ public class Pull extends BasicAction {
             }
         }
         for (VirtualFile root : roots) {
-            GitCommand command = new GitCommand(project, vcs.getSettings(), root);
-
             String initialValue = null;
-            List<GitBranch> rbranches = command.branchList(true);
-            if (rbranches != null && rbranches.size() > 0) {
-                initialValue = command.remoteRepoURL(rbranches.get(0));
-            }
-            String repoURL = Messages.showInputDialog(project,
-                    "Enter remote repository name or URL to pull/merge (empty for default):",
-                    "Pull URL --> " + root.getPath(), Messages.getQuestionIcon(), initialValue, null);
+            String repo = Messages.showInputDialog(project,
+                    "Enter repository & refspec to pull/merge (empty for default/origin):",
+                    "Pull <repository> <refspec>... --> " + root.getPath(), Messages.getQuestionIcon(), initialValue, null);
 
             GitCommandRunnable cmdr = new GitCommandRunnable(project, vcs.getSettings(), root);
-            cmdr.setCommand(GitCommand.FETCH_CMD);
-            cmdr.setArgs(new String[] { repoURL });
+            cmdr.setCommand(GitCommand.PULL_CMD);
+            if(repo != null)
+                cmdr.setArgs(new String[] { repo });
 
             ProgressManager manager = ProgressManager.getInstance();
-            manager.runProcessWithProgressSynchronously(cmdr, "Fetching from " + repoURL, false, project);
+            manager.runProcessWithProgressSynchronously(cmdr, "Pulling... ", false, project);
 
             VcsException ex = cmdr.getException();
             if(ex != null)  {
-                Messages.showErrorDialog(project, ex.getMessage(), "Error occurred during 'git fetch'");
+                Messages.showErrorDialog(project, ex.getMessage(), "Error occurred during 'git pull'");
                 return;
             }
-
-            cmdr.setArgs(new String[] { "--tags", repoURL });
-            manager.runProcessWithProgressSynchronously(cmdr, "Updating tags from " + repoURL, false, project);
-            ex = cmdr.getException();
-            if(ex != null)  {
-                Messages.showErrorDialog(project, ex.getMessage(), "Error occurred during 'git fetch --tags'");
-                return;
-            }
-
-            List<GitBranch> branches = command.branchList();
-            String[] branchesList = new String[branches.size()];
-            GitBranch selectedBranch = null;
-            int i = 0;
-            for (GitBranch b : branches) {
-                 if (!b.isActive() && selectedBranch == null)
-                    selectedBranch = b;
-                branchesList[i++] = b.getName();
-            }
-
-            if(selectedBranch == null)
-                selectedBranch = branches.get(0);
-
-            int branchNum = Messages.showChooseDialog("Select branch to merge into this one(" + command.currentBranch() 
-                    + ")", "Merge Branch", branchesList, selectedBranch.getName(), Messages.getQuestionIcon());
-            if (branchNum < 0) {
-                return;
-            }
-
-            selectedBranch = branches.get(branchNum);
-            cmdr.setCommand(GitCommand.MERGE_CMD);
-            cmdr.setArgs( new String[] { "--strategy=recursive", selectedBranch.getName() });
-            manager.runProcessWithProgressSynchronously(cmdr, "Merging branch " + selectedBranch.getName(), false, project);
-            ex = cmdr.getException();
-            if(ex != null)  {
-                Messages.showErrorDialog(project, ex.getMessage(), "Error occurred during 'git merge'");
-            }
-        }
+        }        
     }
 
     @Override

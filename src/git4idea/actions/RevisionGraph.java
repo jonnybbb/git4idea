@@ -62,7 +62,7 @@ public class RevisionGraph extends BasicAction {
     @Override
     protected boolean isEnabled(@NotNull Project project, @NotNull GitVcs vcs, @NotNull VirtualFile... vFiles) {
         for(VirtualFile file: vFiles)
-            return vcs.getFileAdapter().isFileProcessable(file);
+            return vcs.getFileAdapter().isGitControlled(file);
         
         return false;
     }

@@ -76,7 +76,7 @@ public class Merge extends BasicAction {
             
             GitCommandRunnable cmdr = new GitCommandRunnable(project, vcs.getSettings(), root);
             cmdr.setCommand(GitCommand.MERGE_CMD);
-            cmdr.setArgs(new String[] { "--strategy=recursive", selectedBranch.getName() });
+            cmdr.setArgs(new String[] { selectedBranch.getName() });
 
             ProgressManager manager = ProgressManager.getInstance();
             manager.runProcessWithProgressSynchronously(cmdr, "Merging branch " + selectedBranch.getName(), false, project);

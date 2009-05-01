@@ -60,6 +60,8 @@ public class GitCheckinEnvironment implements CheckinEnvironment {
     private GitVcsSettings settings;
     private String tmpDir = System.getProperty("java.io.tmpdir");
     private File commitMsgFile = new File(tmpDir + File.separator + ".git-commit-msg");
+    private static String DEF_COMMIT_MSG =
+            "\n# Brief commit desciption here\n\n# Full commit description here (comment lines starting with '#' will not be included)\n\n";
 
     public GitCheckinEnvironment(@NotNull Project project, @NotNull GitVcsSettings settings) {
         this.project = project;
@@ -83,7 +85,13 @@ public class GitCheckinEnvironment implements CheckinEnvironment {
     @Override
     @Nullable
     public String getDefaultMessageFor(FilePath[] filesToCheckin) {
-        String defaultMsg = "\n# Brief commit desciption here\n\n# Full commit description here (comment lines starting with '#' will not be included)\n\n";
+        if(filesToCheckin == null || filesToCheckin.length == 0) return null;
+        GitCommand command = new GitCommand(project, settings, GitUtil.getVcsRoot(project,filesToCheckin[0]));
+        String commitTemplate = command.getCommitTemplate();
+
+        if (commitTemplate != null)
+            return commitTemplate;
+
         if (commitMsgFile.exists() && commitMsgFile.canRead()) {
             byte[] msgBytes = new byte[(int) commitMsgFile.length()];
             FileInputStream fis = null;
@@ -93,7 +101,7 @@ public class GitCheckinEnvironment implements CheckinEnvironment {
                 fis.close();
                 return new String(msgBytes);
             } catch (Exception e) {
-                return defaultMsg;
+                return DEF_COMMIT_MSG;
             } finally {
                 try {
                     if (fis != null)
@@ -103,7 +111,7 @@ public class GitCheckinEnvironment implements CheckinEnvironment {
                 }
             }
         } else {
-            return defaultMsg;
+            return DEF_COMMIT_MSG;
         }
     }
 

@@ -48,6 +48,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringReader;
+import java.io.FileInputStream;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -367,6 +368,40 @@ public class GitCommand {
     }
 
     /**
+     * If a Git commit template has been configured, return it's contents.
+     * @return  The commit template or null
+     */
+    public String getCommitTemplate() {
+        try {
+            String [] args = { "commit.template" };
+            String commitTemplateName = execute(CONFIG_CMD, null, args, true);
+            if (commitTemplateName == null || commitTemplateName.trim().length() == 0) return null;
+
+            File commitTemplateFile  = new File(commitTemplateName.trim());
+            if(!commitTemplateFile.exists()) return null;
+
+            byte[] contents = new byte[ (int) commitTemplateFile.length()];
+            FileInputStream fis = null;
+            try {
+                fis = new FileInputStream(commitTemplateFile);
+                fis.read(contents);
+                fis.close();
+                return new String(contents);
+            } catch (Exception e) {
+                return null;
+            } finally {
+                try {
+                    if (fis != null)
+                        fis.close();
+                } catch (IOException ie) {
+                }
+            }
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
      * Builds the revision history for the specifid file.
      *
      * @param filePath The path to the file.
@@ -508,7 +543,7 @@ public class GitCommand {
             BufferedWriter out = null;
             try {
                 temp = File.createTempFile("git-commit-msg", ".txt");
-                options = new String[]{"-i", "-F", temp.getAbsolutePath()};
+                options = new String[]{ "-F", temp.getAbsolutePath()};
                 temp.deleteOnExit();
                 out = new BufferedWriter(new FileWriter(temp));
                 out.write(commitMessage.toString());

@@ -18,6 +18,7 @@ package git4idea.actions;
  */
 import git4idea.GitUtil;
 import git4idea.GitVcs;
+import git4idea.vfs.GitVirtualFileAdapter;
 import git4idea.config.GitVcsSettings;
 import git4idea.commands.GitCommand;
 import com.intellij.openapi.project.Project;
@@ -32,7 +33,6 @@ import java.util.Map;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Arrays;
-import java.util.Collections;
 
 /**
  * Git "add" action
@@ -66,7 +66,7 @@ public class Add extends BasicAction {
             List<VirtualFile> list = roots.get(root);
             VirtualFile[] vfiles = list.toArray(new VirtualFile[list.size()]);
             command.add(vfiles);
-            vcs.getFileAdapter().ignoreFiles(vfiles, false);
+            vcs.getFileAdapter().gitControlFiles(vfiles, true);
         }
 
         VcsDirtyScopeManager mgr = VcsDirtyScopeManager.getInstance(project);
@@ -91,7 +91,7 @@ public class Add extends BasicAction {
             if(vfiles == null || vfiles.length == 0) continue;
             command.add(vfiles);
             GitVcs vcs = (GitVcs) VcsUtil.getVcsFor(project, vfiles[0]);
-            vcs.getFileAdapter().ignoreFiles(vfiles, false);
+            vcs.getFileAdapter().gitControlFiles(vfiles, true);
         }
 
         VcsDirtyScopeManager mgr = VcsDirtyScopeManager.getInstance(project);
@@ -109,9 +109,12 @@ public class Add extends BasicAction {
 
     @Override
     protected boolean isEnabled(@NotNull Project project, @NotNull GitVcs vcs, @NotNull VirtualFile... vFiles) {
-        for (VirtualFile file : vFiles)
-            return !vcs.getFileAdapter().isFileProcessable(file);
-        
+        GitVirtualFileAdapter gfa = vcs.getFileAdapter();
+        for (VirtualFile file : vFiles) {
+            if(gfa.fileIsIgnored(file))
+                return false;
+            return !gfa.isGitControlled(file);
+        }
         return true;
     }
 }

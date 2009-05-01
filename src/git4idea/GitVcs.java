@@ -336,6 +336,6 @@ public class GitVcs extends AbstractVcs implements Disposable {
      */
     public boolean fileExistsInVcs(FilePath path) {
         GitVirtualFile file = new GitVirtualFile(myProject, path.getPath());
-        return gitFileAdapter.isFileProcessable(file);
+        return gitFileAdapter.isGitControlled(file);
     }
 }

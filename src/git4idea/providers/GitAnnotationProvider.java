@@ -27,7 +27,9 @@ import git4idea.commands.GitCommand;
 import git4idea.config.GitVcsSettings;
 import git4idea.vfs.GitRevisionNumber;
 import git4idea.vfs.GitFileRevision;
+import git4idea.vfs.GitVirtualFileAdapter;
 import git4idea.GitUtil;
+import git4idea.GitVcs;
 import git4idea.providers.GitFileAnnotation;
 import org.jetbrains.annotations.NotNull;
 
@@ -56,6 +58,11 @@ public class GitAnnotationProvider implements AnnotationProvider {
         if (file.isDirectory()) {
             throw new VcsException("Cannot annotate a directory");
         }
+
+        // don't try to annotate non-Git files...
+        GitVcs vcs = (GitVcs)VcsUtil.getVcsFor(project, file);
+        GitVirtualFileAdapter gfa = vcs.getFileAdapter();
+        if(!gfa.isGitControlled(file)) return null;
 
         final FileAnnotation[] annotation = new FileAnnotation[1];
         final Exception[] exception = new Exception[1];
@@ -97,6 +104,6 @@ public class GitAnnotationProvider implements AnnotationProvider {
     }
 
     public boolean isAnnotationValid(VcsFileRevision rev) {
-        return (rev instanceof GitFileRevision);
+       return (rev instanceof GitFileRevision);
     }
 }

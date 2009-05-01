@@ -106,7 +106,7 @@ public class Delete extends BasicAction {
     protected boolean isEnabled(@NotNull Project project, @NotNull GitVcs vcs, @NotNull VirtualFile... vFiles) {
         GitVirtualFileAdapter fa = vcs.getFileAdapter();
         for (VirtualFile file : vFiles)
-            return fa.isFileProcessable(file);
+            return fa.isGitControlled(file);
 
         return true;
     }

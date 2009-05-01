@@ -49,35 +49,22 @@ public class Fetch extends BasicAction {
             }
         }
         for (VirtualFile root : roots) {
-            GitCommand command = new GitCommand(project, vcs.getSettings(), root);
-
             String initialValue = null;
-            List<GitBranch> rbranches = command.branchList(true);
-            if (rbranches != null && rbranches.size() > 0) {
-                initialValue = command.remoteRepoURL(rbranches.get(0));
-            }
-            String repoURL = Messages.showInputDialog(project,
-                    "Enter remote repository name or URL to fetch (empty for default):",
-                    "Fetch URL --> " + root.getPath(), Messages.getQuestionIcon(), initialValue, null);
+            String repo = Messages.showInputDialog(project,
+                    "Enter repository & refspec to fetch (empty for default/origin):",
+                    "Fetch <repository> <refspec>... --> " + root.getPath(), Messages.getQuestionIcon(), initialValue, null);
 
             GitCommandRunnable cmdr = new GitCommandRunnable(project, vcs.getSettings(), root);
             cmdr.setCommand(GitCommand.FETCH_CMD);
-            cmdr.setArgs(new String[]{repoURL});
+            if(repo != null)
+                cmdr.setArgs(new String[]{repo});
 
             ProgressManager manager = ProgressManager.getInstance();
-            manager.runProcessWithProgressSynchronously(cmdr, "Fetching from " + repoURL, false, project);
+            manager.runProcessWithProgressSynchronously(cmdr, "Fetching...", false, project);
 
             VcsException ex = cmdr.getException();
             if (ex != null) {
                 Messages.showErrorDialog(project, ex.getMessage(), "Error occurred during 'git fetch'");
-                return;
-            }
-
-            cmdr.setArgs(new String[] { "--tags", repoURL });
-            manager.runProcessWithProgressSynchronously(cmdr, "Updating tags from " + repoURL, false, project);
-            ex = cmdr.getException();
-            if(ex != null)  {
-                Messages.showErrorDialog(project, ex.getMessage(), "Error occurred during 'git fetch --tags'");
                 return;
             }
         }
